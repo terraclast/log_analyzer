@@ -1,44 +1,107 @@
 #!/usr/bin/env bash
 
-# a simple log analyzer
-# Usage: ./log_analyzer.sh /path/to/logs.log
+# Log Analyzer for LoA Server
+LOGFILE="/var/log/syslog" # Default log to analyze
+MODE=""
+PATTERN=""
 
-LOGFILE=$1
-echo "$LOGFILE" 
+# Function to display menu
+function display_menu() {
+    echo "Log Analyzer Options:"
+    echo "1.  Choose a log file"
+    echo "2.  Static Log Analysis"
+    echo "3.  Real-Time Log Monitoring"
+    echo "4.  Exit"
+    echo -n "Choose an option: "
+    read MODE
+}
 
-# Check if file exists
-if [[ ! -f "$LOGFILE" ]]; then
-    echo 'Log file not found!'
-    exit 1
-fi
+# Choose the log file to be read
+function log_choice() {
+    echo -n "Available Log Files:"
+    echo "1. Syslogs"
+    echo "2. Apache2 Access logs"
+    echo "3. Apache2 Error logs"
+    echo "4. Nextcloud logs"
+    echo "5. Enter custom log file path"
+    echo -n "Select a log file (1-5): "
+    read LOG_CHOICE
 
-# Pattern searching
-echo "Analyzing log file: $LOGFILE"
-echo '----------------------------'
+    case $LOG_CHOICE in 
+        1) LOGFILE="/var/log/syslog" 
+            ;;
+        2) LOGFILE="/var/log/apache2/access.log" 
+            ;;
+        3) LOGFILE="/var/log/apache2/error.log"
+            ;;
+        4) LOGFILE="/var/www/nextcloud/data/nextcloud.log"
+            ;;
+        5) 
+            echo -n "Enter the full path of the log file: "
+            read CUSTOM_PATH
+            if [[ -f "$CUSTOM_PATH" ]]; then
+                LOGFILE="$CUSTOM_PATH"
+            else
+                echo "Error: File not found. Using default."
+                LOGFILE="/var/log/syslog"
+            fi
+            ;;
+        *)
+            echo "Invalid choice. Using default log file."
+            LOGFILE="/var/log/syslog"
+            ;;
+    esac
 
-# Count occurances of 'ERROR' and 'WARNING'
-ERROR_COUNT=$(grep -c 'ERROR' "$LOGFILE")
-WARNING_COUNT=$(grep -c "WARNING" "$LOGFILE")
-FAIL_COUNT=$(grep -c "FAIL" "$LOGFILE")
-SDA_COUNT=$(grep -c "SDA" "$LOGFILE")
+    echo "Selected log file: $LOGFILE"
+}
 
-echo "Total ERRORs: $ERROR_COUNT"
-echo "Total WARNINGs: $WARNING_COUNT"
-echo "Total FAILs: $FAIL_COUNT"
-echo "Total SDA logs: $SDA_COUNT"
+# Function for Static Log Analysis
+function static_analysis() {
+    echo -n "Enter regex pattern to search (leave empty for all logs): "
+    read PATTERN
 
-# Display the last 5 'ERROR' lines for review
-echo -e "\nRecent ERRORs:"
-grep "ERROR" "$LOGFILE" | tail -n 5
+    if [[ -z "$PATTERN" ]]; then
+      echo "Displaying all logs from $LOGFILE..."
+      cat "$LOGFILE"
+    else
+        echo "Searching for pattern: $PATTERN in $LOGFILE..."
+        grep --color=always -i "$PATTERN" "$LOGFILE"
+    fi
+}
 
-# Display the last 5 'WARNING' lines for review
-echo -e "\nRecent WARNINGs:"
-grep "WARNING" "$LOGFILE" | tail -n 5
+# Function for Real-Time Log Monitoring
+function real_time_monitoring() {
+    echo -n "Enter regex pattern to monitor (leave empty for all logs): "
+    read PATTERN
 
-# Display the last five 'FAIL' lines for review
-echo -e "\nRecent FAILs:"
-grep "FAIL" "$LOGFILE" | tail -n 5
+    if [[ -z "$PATTERN" ]]; then
+        echo -n "Monitoring all logs in real-time from $LOGFILE..."
+        tail -f "$LOGFILE"
+    else
+        echo "Monitoring logs for pattern: $PATTERN in real-time from $LOGFILE..."
+        tail -f "$LOGFILE" | grep --color=always -i "$PATTERN"
+    fi
+}
 
-# Display the last five "SDA" lines for review
-echo -e "\nRecent SDA activity:"
-grep "SDA" "$LOGFILE" | tail -n 5
+# Main program loop
+while true; do
+    display_menu
+    case $MODE in 
+        1) 
+            log_choice
+            ;;
+        2) 
+            static_analysis
+            ;;
+        3)
+            real_time_monitoring
+            ;;
+        4)
+            echo "Exiting Log Analyzer. Goodbye!"
+            exit 0
+            ;;
+        *)
+            echo "Invalid option. Please try again."
+            ;;
+    esac
+done
